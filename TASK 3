@@ -1,0 +1,64 @@
+import time
+import random
+import paho.mqtt.client as mqtt
+
+# MQTT Broker details
+BROKER = 'broker.hivemq.com'
+PORT = 1883
+TOPIC = 'smartcity/traffic'
+
+def simulate_traffic_sensor():
+    client = mqtt.Client()
+    client.connect(BROKER, PORT, 60)
+    
+    try:
+        while True:
+            vehicle_count = random.randint(0, 20)
+            payload = f"{vehicle_count}"
+            client.publish(TOPIC, payload)
+            print(f"Published: {payload}")
+            time.sleep(5)
+    except KeyboardInterrupt:
+        print("Simulation stopped.")
+    finally:
+        client.disconnect()
+
+if __name__ == "__main__":
+    simulate_traffic_sensor()
+import sqlite3
+import paho.mqtt.client as mqtt
+
+# MQTT Broker details
+BROKER = 'broker.hivemq.com'
+PORT = 1883
+TOPIC = 'smartcity/traffic'
+
+# Database setup
+conn = sqlite3.connect('traffic.db')
+cursor = conn.cursor()
+cursor.execute('''CREATE TABLE IF NOT EXISTS traffic_data
+                  (timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, 
+                   vehicle_count INTEGER)''')
+conn.commit()
+
+def on_message(client, userdata, message):
+    vehicle_count = int(message.payload.decode())
+    cursor.execute('''INSERT INTO traffic_data (vehicle_count)
+                      VALUES (?)''', (vehicle_count,))
+    conn.commit()
+    print(f"Data saved: {vehicle_count}")
+
+def on_connect(client, userdata, flags, rc):
+    print("Connected to broker")
+    client.subscribe(TOPIC)
+
+def start_traffic_server():
+    client = mqtt.Client()
+    client.on_connect = on_connect
+    client.on_message = on_message
+    
+    client.connect(BROKER, PORT, 60)
+    client.loop_forever()
+
+if __name__ == "__main__":
+    start_traffic_server()
